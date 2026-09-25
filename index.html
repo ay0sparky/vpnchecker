@@ -251,7 +251,95 @@
   </div>
 
 <script>
-// === МЯГКИЙ ЗВУК ===
+// === ФОНОВЫЙ ЗВУК ДОЖДЯ ===
+let rainAudio = null;
+function startRainSound() {
+  if (rainAudio) return;
+
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") ctx.resume();
+
+  const master = ctx.createGain();
+  master.gain.value = 0.07; // очень тихо, фоновый
+  master.connect(ctx.destination);
+
+  // 1) ШУМ ДОЖДЯ (белый шум через фильтр)
+  const bufferSize = ctx.sampleRate * 2;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    output[i] = Math.random() * 2 - 1;
+  }
+
+  const noiseSource = ctx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "lowpass";
+  noiseFilter.frequency.value = 1100;
+  noiseFilter.Q.value = 0.7;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.6;
+
+  noiseSource.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(master);
+  noiseSource.start();
+
+  // 2) ЛЁГКИЙ НИЗКИЙ ГУЛ
+  const rumbleOsc = ctx.createOscillator();
+  const rumbleGain = ctx.createGain();
+  rumbleOsc.type = "sine";
+  rumbleOsc.frequency.value = 55;
+  rumbleGain.gain.value = 0.04;
+  rumbleOsc.connect(rumbleGain);
+  rumbleGain.connect(master);
+  rumbleOsc.start();
+
+  // 3) КАПЛИ — редкие, тихие
+  function scheduleDrop() {
+    if (!rainAudio) return;
+    const now = ctx.currentTime;
+    const dropOsc = ctx.createOscillator();
+    const dropGain = ctx.createGain();
+    const dropFilter = ctx.createBiquadFilter();
+
+    dropOsc.type = "sine";
+    const freq = 900 + Math.random() * 1200;
+    dropOsc.frequency.setValueAtTime(freq, now);
+    dropOsc.frequency.exponentialRampToValueAtTime(freq * 0.4, now + 0.08);
+
+    dropFilter.type = "bandpass";
+    dropFilter.frequency.value = freq;
+    dropFilter.Q.value = 8;
+
+    dropGain.gain.setValueAtTime(0.0001, now);
+    dropGain.gain.exponentialRampToValueAtTime(0.05 + Math.random() * 0.04, now + 0.005);
+    dropGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+    dropOsc.connect(dropFilter);
+    dropFilter.connect(dropGain);
+    dropGain.connect(master);
+    dropOsc.start(now);
+    dropOsc.stop(now + 0.15);
+
+    const nextDelay = 150 + Math.random() * 700;
+    setTimeout(scheduleDrop, nextDelay);
+  }
+  scheduleDrop();
+
+  rainAudio = { ctx, master };
+}
+
+function tryStartRain() {
+  if (!rainAudio) startRainSound();
+}
+window.addEventListener("click", tryStartRain, { once: true });
+window.addEventListener("keydown", tryStartRain, { once: true });
+window.addEventListener("touchstart", tryStartRain, { once: true });
+ // === МЯГКИЙ ЗВУК ===
 let audioCtx = null;
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 function playSoft() {
