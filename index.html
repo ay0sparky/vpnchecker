@@ -65,6 +65,7 @@
     box-shadow: 0 0 25px rgba(255,0,51,0.6), 0 0 50px rgba(255,0,51,0.3), inset 0 0 22px rgba(255,0,51,0.18);
   }
   #check:active { transform: scale(0.97); }
+  #check:disabled { opacity: 0.6; cursor: wait; }
   @keyframes pulse {
     from {
       text-shadow: 0 0 6px rgba(255,0,51,0.9), 0 0 14px rgba(255,0,51,0.6), 0 0 28px rgba(255,0,51,0.35);
@@ -432,17 +433,17 @@
     <div id="speedBoxes">
       <div class="speedBox">
         <span class="title">Download</span>
-        <span class="value" id="valDown">starting...</span>
+        <span class="value" id="valDown">waiting...</span>
         <div class="bar" id="barDown"></div>
       </div>
       <div class="speedBox">
         <span class="title">Upload</span>
-        <span class="value" id="valUp">starting...</span>
+        <span class="value" id="valUp">waiting...</span>
         <div class="bar" id="barUp"></div>
       </div>
       <div class="speedBox">
         <span class="title">Ping</span>
-        <span class="value" id="valPing">starting...</span>
+        <span class="value" id="valPing">waiting...</span>
         <div class="bar" id="barPing"></div>
       </div>
     </div>
@@ -822,99 +823,6 @@ async function packetLossTest(count = 20) {
   return { lost, total: count, percent };
 }
 
-async function runCheck() {
-  playSoft();
-  const box = document.getElementById("ipBox");
-  const ipValue = document.getElementById("ipValue");
-  const geoLine = document.getElementById("geoLine");
-  const vpnBadge = document.getElementById("vpnBadge");
-  const extraInfo = document.getElementById("extraInfo");
-  box.classList.remove("show");
-  geoLine.classList.remove("show");
-  vpnBadge.classList.remove("show", "yes", "no");
-  extraInfo.classList.remove("show");
-  void box.offsetWidth;
-  document.getElementById("valLeak").textContent = "scanning...";
-  document.getElementById("valLeak").className = "val";
-  document.getElementById("valDNS").textContent = "scanning...";
-  document.getElementById("valConn").textContent = "scanning...";
-  document.getElementById("valLoss").textContent = "scanning...";
-  ipValue.textContent = "Scanning...";
-  box.classList.add("show");
-  const info = await fetchIPInfo();
-  if (!info) {
-    ipValue.textContent = "no connection";
-    box.classList.remove("show");
-    void box.offsetWidth;
-    box.classList.add("show");
-    return;
-  }
-  ipValue.textContent = info.ip;
-  if (info.country) {
-    document.getElementById("flag").textContent = ccToFlag(info.cc);
-    document.getElementById("countryText").textContent = info.country;
-    document.getElementById("cityText").textContent = info.city || "—";
-    geoLine.classList.add("show");
-  }
-  if (info.vpn !== undefined && info.vpn !== null) {
-    vpnBadge.textContent = info.vpn ? "VPN: YES" : "VPN: NO";
-    vpnBadge.classList.add(info.vpn ? "yes" : "no");
-    vpnBadge.classList.add("show");
-  }
-  box.classList.remove("show");
-  void box.offsetWidth;
-  box.classList.add("show");
-  extraInfo.classList.add("show");
-
-  webrtcLeakTest(info.ip).then(res => {
-    const el = document.getElementById("valLeak");
-    if (res.status === "SECURE") {
-      el.textContent = "SECURE";
-      el.className = "val good";
-    } else if (res.status === "LEAK") {
-      el.textContent = "⚠ LEAK (" + res.ips[0] + ")";
-      el.className = "val bad";
-    } else if (res.status === "BLOCKED") {
-      el.textContent = "BLOCKED";
-      el.className = "val good";
-    } else {
-      el.textContent = "ERROR";
-      el.className = "val warn";
-    }
-  });
-
-  dnsTest().then(res => {
-    const el = document.getElementById("valDNS");
-    el.textContent = res.name + " (" + Math.round(res.time) + "ms)";
-    el.className = "val";
-  });
-
-  const connType = getConnectionType();
-  document.getElementById("valConn").textContent = connType;
-  const connEl = document.getElementById("valConn");
-  if (connType.includes("WI-FI") || connType.includes("ETHERNET")) connEl.className = "val good";
-  else if (connType.includes("4G") || connType.includes("5G")) connEl.className = "val";
-  else if (connType.includes("3G") || connType.includes("2G")) connEl.className = "val warn";
-  else connEl.className = "val";
-
-  packetLossTest().then(res => {
-    const el = document.getElementById("valLoss");
-    if (res.percent === 0) {
-      el.textContent = "0% (" + res.total + "/" + res.total + ")";
-      el.className = "val good";
-    } else if (res.percent < 5) {
-      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
-      el.className = "val";
-    } else if (res.percent < 20) {
-      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
-      el.className = "val warn";
-    } else {
-      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
-      el.className = "val bad";
-    }
-  });
-}
-
 function fetchWithTimeout(url, options = {}, ms = 8000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -923,173 +831,326 @@ function fetchWithTimeout(url, options = {}, ms = 8000) {
 }
 
 // ============================================================
-// === DOWNLOAD — 4 ПОТОКА, ТОЧНЫЙ ЗАМЕР КАК SPEEDTEST =======
+// === SPEED TEST — ОДИН СКАН, СРЕДНИЕ ЗНАЧЕНИЯ ==============
 // ============================================================
-let downRunning = true;
-const DOWN_THREADS = 4;
-const DOWN_CHUNK_SIZE = 100000000; // 100 МБ на поток
-const downServers = [
-  (t, size) => `https://speed.cloudflare.com/__down?bytes=${size}&_=${t}`,
-  (t, size) => `https://speedtest.tele2.net/100MB.zip?_=${t}`,
-  (t, size) => `https://proof.ovh.net/files/100Mb.dat?_=${t}`
-];
-let downServerIdx = 0;
-function setDownStatus(text) { document.getElementById("valDown").textContent = text; }
 
-async function downloadThread(url) {
-  const res = await fetchWithTimeout(url, { cache: "no-store" }, 20000);
-  if (!res.ok || !res.body) throw new Error("bad response");
-  const reader = res.body.getReader();
+// DOWNLOAD — измеряем 10 секунд, потом средняя
+async function scanDownload() {
+  const valEl = document.getElementById("valDown");
+  const barEl = document.getElementById("barDown");
+  valEl.textContent = "scanning...";
+
   const samples = [];
+  const duration = 8000; // 8 секунд сканирования
+  const startTime = performance.now();
+  let totalBytes = 0;
   let windowBytes = 0;
   let windowStart = performance.now();
-  while (downRunning) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) windowBytes += value.length;
+
+  // Несколько параллельных потоков для точности
+  const THREADS = 4;
+  const controllers = [];
+  const threadPromises = [];
+
+  for (let i = 0; i < THREADS; i++) {
+    const controller = new AbortController();
+    controllers.push(controller);
+    threadPromises.push((async () => {
+      try {
+        const url = `https://speed.cloudflare.com/__down?bytes=1000000000&_=${Date.now()}_${i}`;
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        while (true) {
+          if (performance.now() - startTime > duration) {
+            try { reader.cancel(); } catch(_) {}
+            break;
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            totalBytes += value.length;
+            windowBytes += value.length;
+          }
+        }
+      } catch (e) { /* aborted или ошибка */ }
+    })());
+  }
+
+  // Прогресс и график — каждые 200 мс
+  const progressInterval = setInterval(() => {
     const now = performance.now();
     const dt = now - windowStart;
     if (dt >= 200) {
       const bps = windowBytes / (dt / 1000);
-      samples.push(bps * 8 / 1e6);
-      // live update для юзера
-      setDownStatus((bps * 8 / 1e6).toFixed(2) + " Mbps");
-      document.getElementById("barDown").style.width =
-        Math.min(100, ((bps * 8 / 1e6) / 200) * 100) + "%";
-      pushGraphData(graphDataDown, bps * 8 / 1e6);
+      const mbps = (bps * 8) / 1e6;
+      samples.push(mbps);
+      pushGraphData(graphDataDown, mbps);
+      barEl.style.width = Math.min(100, (mbps / 200) * 100) + "%";
       windowBytes = 0;
       windowStart = now;
     }
-  }
-  return samples;
+    const elapsed = performance.now() - startTime;
+    barEl.style.width = Math.min(100, (elapsed / duration) * 100) + "%";
+    if (elapsed >= duration) clearInterval(progressInterval);
+  }, 100);
+
+  await Promise.all(threadPromises);
+  clearInterval(progressInterval);
+  controllers.forEach(c => { try { c.abort(); } catch(_) {} });
+
+  // === СРЕДНЕЕ ЗНАЧЕНИЕ (отбрасываем крайности) ===
+  if (samples.length === 0) return null;
+  samples.sort((a, b) => a - b);
+  const startIdx = Math.floor(samples.length * 0.15);
+  const endIdx = Math.floor(samples.length * 0.85);
+  const trimmed = samples.slice(startIdx, endIdx);
+  const avg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+  return avg;
 }
 
-async function downloadLoop() {
-  while (downRunning) {
-    try {
-      setDownStatus("starting...");
-      const url = downServers[downServerIdx % downServers.length](Date.now(), DOWN_CHUNK_SIZE);
-      downServerIdx++;
-      const threadPromises = [];
-      for (let i = 0; i < DOWN_THREADS; i++) threadPromises.push(downloadThread(url));
-      const results = await Promise.all(threadPromises);
-      const allSamples = results.flat();
-      if (allSamples.length > 0) {
-        allSamples.sort((a, b) => a - b);
-        const startIdx = Math.floor(allSamples.length * 0.25);
-        const endIdx = Math.floor(allSamples.length * 0.90);
-        const trimmed = allSamples.slice(startIdx, endIdx);
-        const finalSpeed = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-        setDownStatus(finalSpeed.toFixed(2) + " Mbps");
-        document.getElementById("barDown").style.width =
-          Math.min(100, (finalSpeed / 200) * 100) + "%";
-        pushGraphData(graphDataDown, finalSpeed);
-      }
-    } catch (e) {
-      if (!downRunning) break;
-      setDownStatus("retrying...");
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-}
+// UPLOAD — измеряем 8 секунд, потом средняя
+async function scanUpload() {
+  const valEl = document.getElementById("valUp");
+  const barEl = document.getElementById("barUp");
+  valEl.textContent = "scanning...";
 
-// ============================================================
-// === UPLOAD — 4 ПОТОКА, ТОЧНЫЙ ЗАМЕР =======================
-// ============================================================
-let upRunning = true;
-const UP_THREADS = 4;
-const UP_CHUNK_SIZE = 2 * 1024 * 1024; // 2 МБ на поток
-function setUpStatus(text) { document.getElementById("valUp").textContent = text; }
-
-async function uploadThread(chunk) {
   const samples = [];
+  const duration = 8000;
+  const startTime = performance.now();
   let windowBytes = 0;
   let windowStart = performance.now();
-  while (upRunning) {
-    let ok = false;
-    try {
-      const res = await fetchWithTimeout(
-        "https://speed.cloudflare.com/__up?_=" + Date.now(),
-        { method: "POST", body: chunk, cache: "no-store" }, 15000);
-      ok = res.ok;
-    } catch (e) { ok = false; }
-    if (!ok) continue;
+
+  const THREADS = 4;
+  const CHUNK_SIZE = 2 * 1024 * 1024; // 2 МБ
+  const chunk = new Blob([new Uint8Array(CHUNK_SIZE)], { type: "application/octet-stream" });
+  const controllers = [];
+  const threadPromises = [];
+
+  for (let i = 0; i < THREADS; i++) {
+    const controller = new AbortController();
+    controllers.push(controller);
+    threadPromises.push((async () => {
+      while (true) {
+        if (performance.now() - startTime > duration) break;
+        try {
+          await fetch("https://speed.cloudflare.com/__up?_=" + Date.now() + "_" + i, {
+            method: "POST",
+            body: chunk,
+            cache: "no-store",
+            signal: controller.signal
+          });
+          windowBytes += CHUNK_SIZE;
+        } catch (e) {
+          break;
+        }
+      }
+    })());
+  }
+
+  const progressInterval = setInterval(() => {
     const now = performance.now();
     const dt = now - windowStart;
-    windowBytes += chunk.size;
-    if (dt >= 200) {
+    if (dt >= 200 && windowBytes > 0) {
       const bps = windowBytes / (dt / 1000);
-      samples.push(bps * 8 / 1e6);
-      setUpStatus((bps * 8 / 1e6).toFixed(2) + " Mbps");
-      document.getElementById("barUp").style.width =
-        Math.min(100, ((bps * 8 / 1e6) / 100) * 100) + "%";
-      pushGraphData(graphDataUp, bps * 8 / 1e6);
+      const mbps = (bps * 8) / 1e6;
+      samples.push(mbps);
+      pushGraphData(graphDataUp, mbps);
+      barEl.style.width = Math.min(100, (mbps / 100) * 100) + "%";
       windowBytes = 0;
       windowStart = now;
     }
-  }
-  return samples;
+    const elapsed = performance.now() - startTime;
+    barEl.style.width = Math.min(100, (elapsed / duration) * 100) + "%";
+    if (elapsed >= duration) clearInterval(progressInterval);
+  }, 100);
+
+  await Promise.all(threadPromises);
+  clearInterval(progressInterval);
+  controllers.forEach(c => { try { c.abort(); } catch(_) {} });
+
+  if (samples.length === 0) return null;
+  samples.sort((a, b) => a - b);
+  const startIdx = Math.floor(samples.length * 0.15);
+  const endIdx = Math.floor(samples.length * 0.85);
+  const trimmed = samples.slice(startIdx, endIdx);
+  const avg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+  return avg;
 }
 
-async function uploadLoop() {
-  while (upRunning) {
-    try {
-      setUpStatus("starting...");
-      const chunk = new Blob([new Uint8Array(UP_CHUNK_SIZE)], { type: "application/octet-stream" });
-      const threadPromises = [];
-      for (let i = 0; i < UP_THREADS; i++) threadPromises.push(uploadThread(chunk));
-      const results = await Promise.all(threadPromises);
-      const allSamples = results.flat();
-      if (allSamples.length > 0) {
-        allSamples.sort((a, b) => a - b);
-        const startIdx = Math.floor(allSamples.length * 0.25);
-        const endIdx = Math.floor(allSamples.length * 0.90);
-        const trimmed = allSamples.slice(startIdx, endIdx);
-        const finalSpeed = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-        setUpStatus(finalSpeed.toFixed(2) + " Mbps");
-        document.getElementById("barUp").style.width =
-          Math.min(100, (finalSpeed / 100) * 100) + "%";
-        pushGraphData(graphDataUp, finalSpeed);
-      }
-    } catch (e) {
-      if (!upRunning) break;
-      setUpStatus("retrying...");
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-}
+// PING — 15 замеров, средняя
+async function scanPing() {
+  const valEl = document.getElementById("valPing");
+  const barEl = document.getElementById("barPing");
+  valEl.textContent = "scanning...";
 
-// === PING ===
-let pingRunning = true;
-function setPingStatus(text) { document.getElementById("valPing").textContent = text; }
-async function pingLoop() {
-  while (pingRunning) {
+  const pings = [];
+  const count = 15;
+
+  for (let i = 0; i < count; i++) {
     const t0 = performance.now();
-    let ok = false;
     try {
-      const res = await fetchWithTimeout(
-        "https://speed.cloudflare.com/__down?bytes=1&_=" + Date.now(),
-        { cache: "no-store" }, 5000);
-      ok = res.ok;
-    } catch (e) { ok = false; }
-    if (ok) {
-      const ping = performance.now() - t0;
-      setPingStatus(Math.round(ping) + " ms");
-      document.getElementById("barPing").style.width =
-        Math.min(100, (ping / 500) * 100) + "%";
-      pushGraphData(graphDataPing, ping);
-    } else {
-      setPingStatus("—");
+      await fetchWithTimeout(
+        "https://speed.cloudflare.com/__down?bytes=1&_=" + Date.now() + "_" + i,
+        { cache: "no-store" }, 3000
+      );
+      pings.push(performance.now() - t0);
+    } catch (e) { /* пропуск */ }
+    // прогресс
+    barEl.style.width = Math.min(100, ((i + 1) / count) * 100) + "%";
+    if (pings.length > 0) {
+      const cur = pings.reduce((a, b) => a + b, 0) / pings.length;
+      pushGraphData(graphDataPing, cur);
     }
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 100));
   }
+
+  if (pings.length === 0) return null;
+  // отбрасываем min/max
+  pings.sort((a, b) => a - b);
+  const trimmed = pings.slice(1, -1);
+  const arr = trimmed.length > 0 ? trimmed : pings;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// ============================================================
+// === ГЛАВНАЯ ФУНКЦИЯ — ПОЛНЫЙ СКАН =========================
+// ============================================================
+let scanning = false;
+
+async function runCheck() {
+  if (scanning) return;
+  scanning = true;
+
+  const checkBtn = document.getElementById("check");
+  checkBtn.disabled = true;
+
+  playSoft();
+
+  const box = document.getElementById("ipBox");
+  const ipValue = document.getElementById("ipValue");
+  const geoLine = document.getElementById("geoLine");
+  const vpnBadge = document.getElementById("vpnBadge");
+  const extraInfo = document.getElementById("extraInfo");
+
+  // Сброс UI
+  box.classList.remove("show");
+  geoLine.classList.remove("show");
+  vpnBadge.classList.remove("show", "yes", "no");
+  extraInfo.classList.remove("show");
+  void box.offsetWidth;
+
+  document.getElementById("valLeak").textContent = "scanning...";
+  document.getElementById("valLeak").className = "val";
+  document.getElementById("valDNS").textContent = "scanning...";
+  document.getElementById("valConn").textContent = "scanning...";
+  document.getElementById("valLoss").textContent = "scanning...";
+
+  document.getElementById("valDown").textContent = "waiting...";
+  document.getElementById("valUp").textContent = "waiting...";
+  document.getElementById("valPing").textContent = "waiting...";
+  document.getElementById("barDown").style.width = "0%";
+  document.getElementById("barUp").style.width = "0%";
+  document.getElementById("barPing").style.width = "0%";
+
+  // Сброс графиков
+  graphDataDown.fill(0);
+  graphDataUp.fill(0);
+  graphDataPing.fill(0);
+
+  // ========== ЭТАП 1: IP + Гео + VPN + Extra ==========
+  ipValue.textContent = "Scanning...";
+  box.classList.add("show");
+
+  const info = await fetchIPInfo();
+
+  if (info) {
+    ipValue.textContent = info.ip;
+    if (info.country) {
+      document.getElementById("flag").textContent = ccToFlag(info.cc);
+      document.getElementById("countryText").textContent = info.country;
+      document.getElementById("cityText").textContent = info.city || "—";
+      geoLine.classList.add("show");
+    }
+    if (info.vpn !== undefined && info.vpn !== null) {
+      vpnBadge.textContent = info.vpn ? "VPN: YES" : "VPN: NO";
+      vpnBadge.classList.add(info.vpn ? "yes" : "no");
+      vpnBadge.classList.add("show");
+    }
+    box.classList.remove("show");
+    void box.offsetWidth;
+    box.classList.add("show");
+    extraInfo.classList.add("show");
+
+    // WebRTC, DNS, Connection, Packet Loss — параллельно
+    webrtcLeakTest(info.ip).then(res => {
+      const el = document.getElementById("valLeak");
+      if (res.status === "SECURE") { el.textContent = "SECURE"; el.className = "val good"; }
+      else if (res.status === "LEAK") { el.textContent = "⚠ LEAK (" + res.ips[0] + ")"; el.className = "val bad"; }
+      else if (res.status === "BLOCKED") { el.textContent = "BLOCKED"; el.className = "val good"; }
+      else { el.textContent = "ERROR"; el.className = "val warn"; }
+    });
+
+    dnsTest().then(res => {
+      const el = document.getElementById("valDNS");
+      el.textContent = res.name + " (" + Math.round(res.time) + "ms)";
+      el.className = "val";
+    });
+
+    const connType = getConnectionType();
+    document.getElementById("valConn").textContent = connType;
+    const connEl = document.getElementById("valConn");
+    if (connType.includes("WI-FI") || connType.includes("ETHERNET")) connEl.className = "val good";
+    else if (connType.includes("4G") || connType.includes("5G")) connEl.className = "val";
+    else if (connType.includes("3G") || connType.includes("2G")) connEl.className = "val warn";
+    else connEl.className = "val";
+
+    packetLossTest().then(res => {
+      const el = document.getElementById("valLoss");
+      if (res.percent === 0) { el.textContent = "0% (" + res.total + "/" + res.total + ")"; el.className = "val good"; }
+      else if (res.percent < 5) { el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")"; el.className = "val"; }
+      else if (res.percent < 20) { el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")"; el.className = "val warn"; }
+      else { el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")"; el.className = "val bad"; }
+    });
+  } else {
+    ipValue.textContent = "no connection";
+    box.classList.remove("show");
+    void box.offsetWidth;
+    box.classList.add("show");
+  }
+
+  // ========== ЭТАП 2: PING ==========
+  const pingAvg = await scanPing();
+  if (pingAvg !== null) {
+    document.getElementById("valPing").textContent = Math.round(pingAvg) + " ms";
+    document.getElementById("barPing").style.width = "100%";
+  } else {
+    document.getElementById("valPing").textContent = "—";
+  }
+
+  // ========== ЭТАП 3: DOWNLOAD ==========
+  const downAvg = await scanDownload();
+  if (downAvg !== null) {
+    document.getElementById("valDown").textContent = downAvg.toFixed(2) + " Mbps";
+    document.getElementById("barDown").style.width = "100%";
+  } else {
+    document.getElementById("valDown").textContent = "—";
+  }
+
+  // ========== ЭТАП 4: UPLOAD ==========
+  const upAvg = await scanUpload();
+  if (upAvg !== null) {
+    document.getElementById("valUp").textContent = upAvg.toFixed(2) + " Mbps";
+    document.getElementById("barUp").style.width = "100%";
+  } else {
+    document.getElementById("valUp").textContent = "—";
+  }
+
+  checkBtn.disabled = false;
+  scanning = false;
 }
 
 window.addEventListener("load", () => {
-  runCheck();
-  downloadLoop();
-  uploadLoop();
-  pingLoop();
   showRandomQuote();
 });
 </script>
