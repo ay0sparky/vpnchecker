@@ -318,7 +318,6 @@
   }
   #quoteBox.show { opacity: 1; }
 
-  /* ====== МОБИЛЬНАЯ АДАПТАЦИЯ ====== */
   @media (max-width: 768px) {
     body {
       padding: 16px 10px 320px 10px;
@@ -348,19 +347,13 @@
     #gpsIcon { width: 16px; height: 16px; }
     #countryText { letter-spacing: 2px; }
     #cityText { letter-spacing: 1px; }
-
     .infoLine {
       font-size: clamp(10px, 3vw, 13px);
       letter-spacing: 1px;
       gap: 6px;
     }
-
-    #speedGraph {
-      height: 50px;
-    }
-    #speedBoxes {
-      gap: 6px;
-    }
+    #speedGraph { height: 50px; }
+    #speedBoxes { gap: 6px; }
     .speedBox {
       padding: 10px 6px;
       letter-spacing: 1.5px;
@@ -368,7 +361,6 @@
     }
     .speedBox .title { letter-spacing: 1.5px; font-size: 0.8em; }
     .speedBox .value { font-size: 0.7em; letter-spacing: 0; }
-
     #quoteBox {
       bottom: 230px;
       font-size: clamp(9px, 2.6vw, 12px);
@@ -379,7 +371,6 @@
     }
   }
 
-  /* Совсем узкие экраны (старые телефоны) */
   @media (max-width: 380px) {
     #check {
       font-size: 20px;
@@ -600,7 +591,6 @@ const canvas = document.getElementById("rain");
 const ctx = canvas.getContext("2d");
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 resize(); window.addEventListener("resize", resize);
-// Меньше капель на мобиле для производительности
 const isMobile = window.innerWidth < 768;
 const DROP_COUNT = isMobile ? 100 : 220;
 const drops = [];
@@ -932,110 +922,144 @@ function fetchWithTimeout(url, options = {}, ms = 8000) {
     .finally(() => clearTimeout(timer));
 }
 
+// ============================================================
+// === DOWNLOAD — 4 ПОТОКА, ТОЧНЫЙ ЗАМЕР КАК SPEEDTEST =======
+// ============================================================
 let downRunning = true;
+const DOWN_THREADS = 4;
+const DOWN_CHUNK_SIZE = 100000000; // 100 МБ на поток
 const downServers = [
-  (t) => `https://speed.cloudflare.com/__down?bytes=200000000&_=${t}`,
-  (t) => `https://speedtest.tele2.net/100MB.zip?_=${t}`,
-  (t) => `https://proof.ovh.net/files/100Mb.dat?_=${t}`,
-  (t) => `https://download.thinkbroadband.com/50MB.zip?_=${t}`
+  (t, size) => `https://speed.cloudflare.com/__down?bytes=${size}&_=${t}`,
+  (t, size) => `https://speedtest.tele2.net/100MB.zip?_=${t}`,
+  (t, size) => `https://proof.ovh.net/files/100Mb.dat?_=${t}`
 ];
 let downServerIdx = 0;
 function setDownStatus(text) { document.getElementById("valDown").textContent = text; }
-async function downloadOnce() {
-  const url = downServers[downServerIdx % downServers.length](Date.now());
-  downServerIdx++;
-  const res = await fetchWithTimeout(url, { cache: "no-store" }, 8000);
+
+async function downloadThread(url) {
+  const res = await fetchWithTimeout(url, { cache: "no-store" }, 20000);
   if (!res.ok || !res.body) throw new Error("bad response");
   const reader = res.body.getReader();
+  const samples = [];
   let windowBytes = 0;
   let windowStart = performance.now();
-  let gotAnyData = false;
   while (downRunning) {
-    const readPromise = reader.read();
-    const timeoutPromise = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error("read timeout")), 5000));
-    let result;
-    try { result = await Promise.race([readPromise, timeoutPromise]); }
-    catch (e) { try { reader.cancel(); } catch(_){} throw e; }
-    const { done, value } = result;
+    const { done, value } = await reader.read();
     if (done) break;
-    if (value) { windowBytes += value.length; gotAnyData = true; }
+    if (value) windowBytes += value.length;
     const now = performance.now();
     const dt = now - windowStart;
-    if (dt >= 500) {
+    if (dt >= 200) {
       const bps = windowBytes / (dt / 1000);
-      const mbps = (bps * 8) / 1e6;
-      setDownStatus(mbps.toFixed(2) + " Mbps");
+      samples.push(bps * 8 / 1e6);
+      // live update для юзера
+      setDownStatus((bps * 8 / 1e6).toFixed(2) + " Mbps");
       document.getElementById("barDown").style.width =
-        Math.min(100, (mbps / 200) * 100) + "%";
-      pushGraphData(graphDataDown, mbps);
+        Math.min(100, ((bps * 8 / 1e6) / 200) * 100) + "%";
+      pushGraphData(graphDataDown, bps * 8 / 1e6);
       windowBytes = 0;
       windowStart = now;
     }
   }
-  if (!gotAnyData) throw new Error("no data");
+  return samples;
 }
+
 async function downloadLoop() {
-  let failures = 0;
   while (downRunning) {
     try {
       setDownStatus("starting...");
-      await downloadOnce();
-      failures = 0;
+      const url = downServers[downServerIdx % downServers.length](Date.now(), DOWN_CHUNK_SIZE);
+      downServerIdx++;
+      const threadPromises = [];
+      for (let i = 0; i < DOWN_THREADS; i++) threadPromises.push(downloadThread(url));
+      const results = await Promise.all(threadPromises);
+      const allSamples = results.flat();
+      if (allSamples.length > 0) {
+        allSamples.sort((a, b) => a - b);
+        const startIdx = Math.floor(allSamples.length * 0.25);
+        const endIdx = Math.floor(allSamples.length * 0.90);
+        const trimmed = allSamples.slice(startIdx, endIdx);
+        const finalSpeed = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+        setDownStatus(finalSpeed.toFixed(2) + " Mbps");
+        document.getElementById("barDown").style.width =
+          Math.min(100, (finalSpeed / 200) * 100) + "%";
+        pushGraphData(graphDataDown, finalSpeed);
+      }
     } catch (e) {
       if (!downRunning) break;
-      failures++;
-      setDownStatus(failures > 2 ? "retrying..." : "connecting...");
+      setDownStatus("retrying...");
       await new Promise(r => setTimeout(r, 500));
     }
   }
 }
 
+// ============================================================
+// === UPLOAD — 4 ПОТОКА, ТОЧНЫЙ ЗАМЕР =======================
+// ============================================================
 let upRunning = true;
+const UP_THREADS = 4;
+const UP_CHUNK_SIZE = 2 * 1024 * 1024; // 2 МБ на поток
 function setUpStatus(text) { document.getElementById("valUp").textContent = text; }
-async function uploadLoop() {
-  const chunkSize = 512 * 1024;
-  const chunk = new Blob([new Uint8Array(chunkSize)], { type: "application/octet-stream" });
+
+async function uploadThread(chunk) {
+  const samples = [];
   let windowBytes = 0;
   let windowStart = performance.now();
-  let failures = 0;
-  let lastProgress = performance.now();
   while (upRunning) {
     let ok = false;
     try {
       const res = await fetchWithTimeout(
         "https://speed.cloudflare.com/__up?_=" + Date.now(),
-        { method: "POST", body: chunk, cache: "no-store" }, 10000);
+        { method: "POST", body: chunk, cache: "no-store" }, 15000);
       ok = res.ok;
     } catch (e) { ok = false; }
-    if (ok) {
-      failures = 0;
-      windowBytes += chunkSize;
-      lastProgress = performance.now();
-    } else {
-      failures++;
-      if (failures > 2) {
-        setUpStatus("retrying...");
-        await new Promise(r => setTimeout(r, 500));
-        continue;
-      }
-    }
+    if (!ok) continue;
     const now = performance.now();
     const dt = now - windowStart;
-    if (now - lastProgress > 3000 && failures > 0) setUpStatus("connecting...");
-    if (dt >= 500 && windowBytes > 0) {
+    windowBytes += chunk.size;
+    if (dt >= 200) {
       const bps = windowBytes / (dt / 1000);
-      const mbps = (bps * 8) / 1e6;
-      setUpStatus(mbps.toFixed(2) + " Mbps");
+      samples.push(bps * 8 / 1e6);
+      setUpStatus((bps * 8 / 1e6).toFixed(2) + " Mbps");
       document.getElementById("barUp").style.width =
-        Math.min(100, (mbps / 100) * 100) + "%";
-      pushGraphData(graphDataUp, mbps);
+        Math.min(100, ((bps * 8 / 1e6) / 100) * 100) + "%";
+      pushGraphData(graphDataUp, bps * 8 / 1e6);
       windowBytes = 0;
-      windowStart = performance.now();
+      windowStart = now;
+    }
+  }
+  return samples;
+}
+
+async function uploadLoop() {
+  while (upRunning) {
+    try {
+      setUpStatus("starting...");
+      const chunk = new Blob([new Uint8Array(UP_CHUNK_SIZE)], { type: "application/octet-stream" });
+      const threadPromises = [];
+      for (let i = 0; i < UP_THREADS; i++) threadPromises.push(uploadThread(chunk));
+      const results = await Promise.all(threadPromises);
+      const allSamples = results.flat();
+      if (allSamples.length > 0) {
+        allSamples.sort((a, b) => a - b);
+        const startIdx = Math.floor(allSamples.length * 0.25);
+        const endIdx = Math.floor(allSamples.length * 0.90);
+        const trimmed = allSamples.slice(startIdx, endIdx);
+        const finalSpeed = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+        setUpStatus(finalSpeed.toFixed(2) + " Mbps");
+        document.getElementById("barUp").style.width =
+          Math.min(100, (finalSpeed / 100) * 100) + "%";
+        pushGraphData(graphDataUp, finalSpeed);
+      }
+    } catch (e) {
+      if (!upRunning) break;
+      setUpStatus("retrying...");
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 }
 
+// === PING ===
 let pingRunning = true;
 function setPingStatus(text) { document.getElementById("valPing").textContent = text; }
 async function pingLoop() {
