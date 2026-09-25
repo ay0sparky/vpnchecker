@@ -3,19 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <title>CHECK</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; cursor: crosshair; }
   html, body {
     height: 100%; margin: 0; overflow: hidden;
     font-family: 'Courier New', monospace;
     background: #0a0a0a;
   }
+  html { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg stroke='white' stroke-width='1.5' stroke-linecap='round'%3E%3Cline x1='12' y1='4' x2='12' y2='20'/%3E%3Cline x1='4' y1='12' x2='20' y2='12'/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
+  button, a, #check { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='4' x2='12' y2='20'/%3E%3Cline x1='4' y1='12' x2='20' y2='12'/%3E%3C/g%3E%3C/svg%3E") 12 12, pointer; }
+
   body {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 22px; position: relative;
-    padding-bottom: 140px;
+    padding-bottom: 280px;
   }
   #redglow {
     position: fixed; top: 50%; left: 50%;
@@ -43,7 +45,7 @@
       0 0 6px rgba(255,0,51,0.9),
       0 0 14px rgba(255,0,51,0.6),
       0 0 28px rgba(255,0,51,0.35);
-    cursor: pointer; user-select: none;
+    user-select: none;
     background: rgba(10, 0, 5, 0.5);
     border: 2px solid #ff0033; border-radius: 8px;
     padding: 16px 42px 16px 52px;
@@ -71,8 +73,6 @@
       box-shadow: 0 0 25px rgba(255,0,51,0.55), inset 0 0 22px rgba(255,0,51,0.16);
     }
   }
-
-  /* Рамка IP + страна */
   #ipBox {
     position: relative; z-index: 2;
     min-width: 480px; min-height: 70px;
@@ -90,7 +90,6 @@
     from { opacity: 0; transform: translateY(12px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
-
   #ipValue {
     font-family: 'Courier New', monospace;
     font-size: clamp(20px, 3.2vw, 34px);
@@ -99,9 +98,9 @@
     text-shadow: 0 0 6px rgba(255,0,51,0.8), 0 0 16px rgba(255,0,51,0.4);
   }
 
-  /* Строка со страной */
   #geoLine {
     display: none;
+    flex-direction: column;
     align-items: center;
     gap: 10px;
     font-family: 'Courier New', monospace;
@@ -112,15 +111,18 @@
     border-top: 1px solid rgba(255,0,51,0.3);
     padding-top: 10px;
     width: 100%;
-    justify-content: center;
   }
   #geoLine.show { display: flex; animation: geoIn 0.4s ease-out; }
   @keyframes geoIn {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-
-  /* GPS-иконка */
+  .geoRow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
   #gpsIcon {
     display: inline-block;
     width: 22px; height: 22px;
@@ -133,49 +135,117 @@
     from { filter: drop-shadow(0 0 4px rgba(255,0,51,0.6)); }
     to   { filter: drop-shadow(0 0 12px rgba(255,0,51,1)); }
   }
-
-  #flag {
-    font-size: 1.1em;
-    line-height: 1;
-    filter: drop-shadow(0 0 6px rgba(255,0,51,0.5));
-  }
-
-  #countryText {
-    color: #fff;
-    font-weight: bold;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-  }
+  #flag { font-size: 1.1em; line-height: 1; filter: drop-shadow(0 0 6px rgba(255,0,51,0.5)); }
+  #countryText { color: #fff; font-weight: bold; letter-spacing: 3px; text-transform: uppercase; }
   #cityText {
-    color: #ff5577;
-    font-weight: bold;
-    letter-spacing: 2px;
+    color: #ff5577; font-weight: bold; letter-spacing: 2px;
     text-transform: uppercase;
     text-shadow: 0 0 6px rgba(255,0,51,0.8);
   }
-  .sep {
-    color: rgba(255,0,51,0.5);
-    margin: 0 2px;
+  .sep { color: rgba(255,0,51,0.5); margin: 0 2px; }
+
+  #vpnBadge {
+    display: none;
+    padding: 4px 16px;
+    border-radius: 4px;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: vpnIn 0.4s ease-out;
+  }
+  #vpnBadge.show { display: inline-block; }
+  #vpnBadge.yes {
+    color: #ff5577;
+    background: rgba(255, 0, 51, 0.15);
+    border: 1px solid #ff0033;
+    box-shadow: 0 0 15px rgba(255,0,51,0.6), inset 0 0 10px rgba(255,0,51,0.2);
+    text-shadow: 0 0 6px rgba(255,0,51,0.9);
+  }
+  #vpnBadge.no {
+    color: #66ff88;
+    background: rgba(0, 255, 100, 0.1);
+    border: 1px solid #00cc44;
+    box-shadow: 0 0 15px rgba(0,255,100,0.4), inset 0 0 10px rgba(0,255,100,0.15);
+    text-shadow: 0 0 6px rgba(0,255,100,0.8);
+  }
+  @keyframes vpnIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
   }
 
-  /* Нижняя панель — 2 окна */
+  #extraInfo {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    width: 100%;
+  }
+  #extraInfo.show { display: flex; animation: geoIn 0.4s ease-out; }
+
+  .infoLine {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(12px, 1.5vw, 16px);
+    letter-spacing: 2px;
+    color: #aaa;
+    text-transform: uppercase;
+  }
+  .infoLine .label {
+    color: rgba(255,0,51,0.7);
+    font-weight: bold;
+  }
+  .infoLine .val {
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 0 0 6px rgba(255,0,51,0.6);
+  }
+  .infoLine .val.good {
+    color: #66ff88;
+    text-shadow: 0 0 6px rgba(0,255,100,0.7);
+  }
+  .infoLine .val.bad {
+    color: #ff5577;
+    text-shadow: 0 0 6px rgba(255,0,51,0.9);
+  }
+  .infoLine .val.warn {
+    color: #ffaa00;
+    text-shadow: 0 0 6px rgba(255,170,0,0.8);
+  }
+
   #bottomBar {
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 3;
+    display: flex; flex-direction: column;
+    gap: 10px;
+    padding: 14px 18px 18px 18px;
+    background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.65), rgba(0,0,0,0));
+    pointer-events: none;
+  }
+  #speedGraph {
+    width: 100%;
+    height: 70px;
+    border: 1px solid rgba(255,0,51,0.4);
+    border-radius: 6px;
+    background: rgba(5,5,5,0.6);
+    box-shadow: 0 0 15px rgba(255,0,51,0.15), inset 0 0 15px rgba(255,0,51,0.05);
+  }
+  #speedBoxes {
     display: flex;
     gap: 14px;
-    padding: 18px;
-    background: linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0.55), rgba(0,0,0,0));
-    pointer-events: none;
   }
   .speedBox {
     flex: 1;
-    padding: 20px 24px;
+    padding: 16px 20px;
     font-family: 'Trebuchet MS', 'Segoe UI', Arial, sans-serif;
-    font-size: clamp(18px, 2.4vw, 28px);
+    font-size: clamp(14px, 1.8vw, 22px);
     font-weight: 700;
-    letter-spacing: 6px;
+    letter-spacing: 5px;
     text-transform: uppercase;
     color: #ff0033;
     background: rgba(10, 0, 5, 0.6);
@@ -188,7 +258,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     position: relative;
     overflow: hidden;
     animation: boxRun 1.6s ease-in-out infinite alternate;
@@ -197,10 +267,10 @@
     from { box-shadow: 0 0 15px rgba(255,0,51,0.3), inset 0 0 15px rgba(255,0,51,0.08); }
     to   { box-shadow: 0 0 30px rgba(255,0,51,0.6), inset 0 0 22px rgba(255,0,51,0.18); }
   }
-  .speedBox .title { font-size: 0.9em; letter-spacing: 6px; }
+  .speedBox .title { font-size: 0.85em; letter-spacing: 5px; }
   .speedBox .value {
     font-family: 'Courier New', monospace;
-    font-size: 0.85em;
+    font-size: 0.8em;
     letter-spacing: 2px;
     color: #fff;
     text-shadow: 0 0 8px rgba(255,0,51,0.8), 0 0 16px rgba(255,0,51,0.4);
@@ -213,6 +283,31 @@
     box-shadow: 0 0 12px #ff0033;
     transition: width 0.25s linear;
   }
+
+  /* Random quote над нижней панелью */
+  #quoteBox {
+    position: fixed;
+    bottom: 240px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(11px, 1.3vw, 14px);
+    font-style: italic;
+    letter-spacing: 3px;
+    color: rgba(255, 0, 51, 0.65);
+    text-shadow: 0 0 8px rgba(255,0,51,0.6), 0 0 18px rgba(255,0,51,0.3);
+    text-align: center;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.2s ease-in-out;
+    max-width: 90vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #quoteBox.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -224,71 +319,131 @@
   <div id="ipBox">
     <div id="ipValue"></div>
     <div id="geoLine">
-      <!-- GPS иконка -->
-      <svg id="gpsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-        <circle cx="12" cy="12" r="8"></circle>
-      </svg>
-      <span id="flag"></span>
-      <span id="countryText"></span>
-      <span class="sep">,</span>
-      <span id="cityText"></span>
+      <div class="geoRow">
+        <svg id="gpsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+          <circle cx="12" cy="12" r="8"></circle>
+        </svg>
+        <span id="flag"></span>
+        <span id="countryText"></span>
+        <span class="sep">,</span>
+        <span id="cityText"></span>
+      </div>
+      <span id="vpnBadge">VPN</span>
+      <div id="extraInfo">
+        <div class="infoLine">
+          <span class="label">WEBRTC LEAK:</span>
+          <span class="val" id="valLeak">scanning...</span>
+        </div>
+        <div class="infoLine">
+          <span class="label">DNS:</span>
+          <span class="val" id="valDNS">scanning...</span>
+        </div>
+        <div class="infoLine">
+          <span class="label">CONNECTION:</span>
+          <span class="val" id="valConn">scanning...</span>
+        </div>
+        <div class="infoLine">
+          <span class="label">PACKET LOSS:</span>
+          <span class="val" id="valLoss">scanning...</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="bottomBar">
-    <div class="speedBox">
-      <span class="title">Download</span>
-      <span class="value" id="valDown">starting...</span>
-      <div class="bar" id="barDown"></div>
-    </div>
-    <div class="speedBox">
-      <span class="title">Upload</span>
-      <span class="value" id="valUp">starting...</span>
-      <div class="bar" id="barUp"></div>
+    <canvas id="speedGraph"></canvas>
+    <div id="speedBoxes">
+      <div class="speedBox">
+        <span class="title">Download</span>
+        <span class="value" id="valDown">starting...</span>
+        <div class="bar" id="barDown"></div>
+      </div>
+      <div class="speedBox">
+        <span class="title">Upload</span>
+        <span class="value" id="valUp">starting...</span>
+        <div class="bar" id="barUp"></div>
+      </div>
+      <div class="speedBox">
+        <span class="title">Ping</span>
+        <span class="value" id="valPing">starting...</span>
+        <div class="bar" id="barPing"></div>
+      </div>
     </div>
   </div>
 
+  <div id="quoteBox"></div>
+
 <script>
+// === RANDOM QUOTE ===
+const quotes = [
+  "The grid never sleeps.",
+  "Speed is power.",
+  "Latency kills.",
+  "Silence the noise. Listen to the signal.",
+  "Stay invisible. Stay fast.",
+  "Data flows. Truth remains.",
+  "The network remembers.",
+  "Every packet is a promise.",
+  "Encryption is a lifestyle.",
+  "Packets don't lie.",
+  "Your IP is a fingerprint.",
+  "Privacy is not a crime.",
+  "Fast in. Fast out. No trace.",
+  "Trust the protocol.",
+  "The signal is the message.",
+  "Move quiet. Move clean.",
+  "Own your connection.",
+  "Bandwidth is freedom.",
+  "Logs are for the weak.",
+  "Route yourself wisely.",
+  "Anonymous is a state of mind.",
+  "Trace nothing. Leave nothing.",
+  "The wire never forgets.",
+  "Stay encrypted, stay free.",
+  "You are not a number.",
+  "VPN on. World off.",
+  "Speed doesn't ask questions.",
+  "Every ms matters.",
+  "Signal over noise.",
+  "No lag. No trace. No fear."
+];
+
+function showRandomQuote() {
+  const box = document.getElementById("quoteBox");
+  if (!box) return;
+  const q = quotes[Math.floor(Math.random() * quotes.length)];
+  box.textContent = "— " + q + " —";
+  setTimeout(() => box.classList.add("show"), 1000);
+}
+
 // === ФОНОВЫЙ ЗВУК ДОЖДЯ ===
 let rainAudio = null;
 function startRainSound() {
   if (rainAudio) return;
-
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   if (ctx.state === "suspended") ctx.resume();
-
   const master = ctx.createGain();
-  master.gain.value = 0.07; // очень тихо, фоновый
+  master.gain.value = 0.07;
   master.connect(ctx.destination);
-
-  // 1) ШУМ ДОЖДЯ (белый шум через фильтр)
   const bufferSize = ctx.sampleRate * 2;
   const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const output = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    output[i] = Math.random() * 2 - 1;
-  }
-
+  for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
   const noiseSource = ctx.createBufferSource();
   noiseSource.buffer = noiseBuffer;
   noiseSource.loop = true;
-
   const noiseFilter = ctx.createBiquadFilter();
   noiseFilter.type = "lowpass";
   noiseFilter.frequency.value = 1100;
   noiseFilter.Q.value = 0.7;
-
   const noiseGain = ctx.createGain();
   noiseGain.gain.value = 0.6;
-
   noiseSource.connect(noiseFilter);
   noiseFilter.connect(noiseGain);
   noiseGain.connect(master);
   noiseSource.start();
-
-  // 2) ЛЁГКИЙ НИЗКИЙ ГУЛ
   const rumbleOsc = ctx.createOscillator();
   const rumbleGain = ctx.createGain();
   rumbleOsc.type = "sine";
@@ -297,49 +452,39 @@ function startRainSound() {
   rumbleOsc.connect(rumbleGain);
   rumbleGain.connect(master);
   rumbleOsc.start();
-
-  // 3) КАПЛИ — редкие, тихие
   function scheduleDrop() {
     if (!rainAudio) return;
     const now = ctx.currentTime;
     const dropOsc = ctx.createOscillator();
     const dropGain = ctx.createGain();
     const dropFilter = ctx.createBiquadFilter();
-
     dropOsc.type = "sine";
     const freq = 900 + Math.random() * 1200;
     dropOsc.frequency.setValueAtTime(freq, now);
     dropOsc.frequency.exponentialRampToValueAtTime(freq * 0.4, now + 0.08);
-
     dropFilter.type = "bandpass";
     dropFilter.frequency.value = freq;
     dropFilter.Q.value = 8;
-
     dropGain.gain.setValueAtTime(0.0001, now);
     dropGain.gain.exponentialRampToValueAtTime(0.05 + Math.random() * 0.04, now + 0.005);
     dropGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-
     dropOsc.connect(dropFilter);
     dropFilter.connect(dropGain);
     dropGain.connect(master);
     dropOsc.start(now);
     dropOsc.stop(now + 0.15);
-
     const nextDelay = 150 + Math.random() * 700;
     setTimeout(scheduleDrop, nextDelay);
   }
   scheduleDrop();
-
   rainAudio = { ctx, master };
 }
-
-function tryStartRain() {
-  if (!rainAudio) startRainSound();
-}
+function tryStartRain() { if (!rainAudio) startRainSound(); }
 window.addEventListener("click", tryStartRain, { once: true });
 window.addEventListener("keydown", tryStartRain, { once: true });
 window.addEventListener("touchstart", tryStartRain, { once: true });
- // === МЯГКИЙ ЗВУК ===
+
+// === МЯГКИЙ ЗВУК ===
 let audioCtx = null;
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 function playSoft() {
@@ -355,7 +500,6 @@ function playSoft() {
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
   osc.connect(gain); gain.connect(audioCtx.destination);
   osc.start(now); osc.stop(now + 0.45);
-
   const osc2 = audioCtx.createOscillator();
   const gain2 = audioCtx.createGain();
   osc2.type = "sine";
@@ -367,7 +511,7 @@ function playSoft() {
   osc2.start(now); osc2.stop(now + 0.4);
 }
 
-// === ДОЖДЬ ===
+// === ДОЖДЬ (canvas) ===
 const canvas = document.getElementById("rain");
 const ctx = canvas.getContext("2d");
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -398,49 +542,207 @@ function drawRain() {
 }
 drawRain();
 
-// === IP + ГЕО ===
+// === ГРАФИК СКОРОСТИ ===
+const graphCanvas = document.getElementById("speedGraph");
+const gctx = graphCanvas.getContext("2d");
+let graphDataDown = new Array(120).fill(0);
+let graphDataUp = new Array(120).fill(0);
+let graphDataPing = new Array(120).fill(0);
+function resizeGraph() {
+  const rect = graphCanvas.getBoundingClientRect();
+  graphCanvas.width = rect.width;
+  graphCanvas.height = rect.height;
+}
+resizeGraph();
+window.addEventListener("resize", resizeGraph);
+function pushGraphData(arr, val) {
+  arr.push(val);
+  if (arr.length > 120) arr.shift();
+}
+function drawGraph() {
+  const w = graphCanvas.width;
+  const h = graphCanvas.height;
+  gctx.clearRect(0, 0, w, h);
+  gctx.strokeStyle = "rgba(255, 0, 51, 0.08)";
+  gctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (h / 4) * i;
+    gctx.beginPath();
+    gctx.moveTo(0, y);
+    gctx.lineTo(w, y);
+    gctx.stroke();
+  }
+  const step = w / 119;
+  const maxDown = 200, maxUp = 100, maxPing = 500;
+  function drawLine(data, max, color, glow) {
+    gctx.strokeStyle = color;
+    gctx.lineWidth = 2;
+    gctx.shadowColor = glow;
+    gctx.shadowBlur = 8;
+    gctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = i * step;
+      const y = h - Math.min(h, (data[i] / max) * h);
+      if (i === 0) gctx.moveTo(x, y);
+      else gctx.lineTo(x, y);
+    }
+    gctx.stroke();
+    gctx.shadowBlur = 0;
+  }
+  drawLine(graphDataDown, maxDown, "#ff0033", "#ff0033");
+  drawLine(graphDataUp, maxUp, "#ffffff", "#ffffff");
+  drawLine(graphDataPing, maxPing, "#ffaa00", "#ffaa00");
+  gctx.font = "11px 'Courier New'";
+  gctx.fillStyle = "#ff0033"; gctx.fillText("DL", 8, 14);
+  gctx.fillStyle = "#ffffff"; gctx.fillText("UL", 40, 14);
+  gctx.fillStyle = "#ffaa00"; gctx.fillText("PING", 72, 14);
+  requestAnimationFrame(drawGraph);
+}
+drawGraph();
+
+// === IP + ГЕО + VPN + EXTRA ===
 async function fetchIPInfo() {
-  // Сервисы, которые отдают IP + страну + город + код страны
   const services = [
     async () => {
       const r = await fetch("https://ipwho.is/", { cache: "no-store" });
       const d = await r.json();
       if (!d.success) throw new Error();
-      return { ip: d.ip, country: d.country, city: d.city, cc: d.country_code };
+      return { ip: d.ip, country: d.country, city: d.city, cc: d.country_code, vpn: false };
     },
     async () => {
       const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
       const d = await r.json();
       if (!d.ip) throw new Error();
-      return { ip: d.ip, country: d.country_name, city: d.city, cc: d.country_code };
+      return {
+        ip: d.ip, country: d.country_name, city: d.city, cc: d.country_code,
+        vpn: (d.security && d.security.is_vpn) || false
+      };
     },
     async () => {
       const r = await fetch("https://api.my-ip.io/ip.json", { cache: "no-store" });
       const d = await r.json();
-      // этот сервис не даёт страну — вернём только IP
-      return { ip: d.ip, country: null, city: null, cc: null };
+      return { ip: d.ip, country: null, city: null, cc: null, vpn: false };
     },
     async () => {
       const r = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
       const d = await r.json();
-      return { ip: d.ip, country: null, city: null, cc: null };
+      return { ip: d.ip, country: null, city: null, cc: null, vpn: false };
     }
   ];
-
   for (const fn of services) {
     try {
       const info = await fn();
       if (info && info.ip) return info;
-    } catch (e) { /* пробуем следующий */ }
+    } catch (e) { }
   }
   return null;
 }
-
-// Преобразование кода страны в эмодзи-флаг
 function ccToFlag(cc) {
   if (!cc || cc.length !== 2) return "🌐";
   const codePoints = cc.toUpperCase().split("").map(c => 127397 + c.charCodeAt(0));
   return String.fromCodePoint(...codePoints);
+}
+
+async function webrtcLeakTest(publicIP) {
+  return new Promise((resolve) => {
+    const ips = new Set();
+    let pc;
+    let resolved = false;
+    const done = (result) => {
+      if (resolved) return;
+      resolved = true;
+      try { pc && pc.close(); } catch(e) {}
+      resolve(result);
+    };
+    const timeout = setTimeout(() => {
+      if (ips.size === 0) done({ status: "BLOCKED", ips: [] });
+    }, 5000);
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      });
+      pc.createDataChannel("test");
+      pc.onicecandidate = (e) => {
+        if (!e.candidate) {
+          clearTimeout(timeout);
+          if (ips.size === 0) return done({ status: "BLOCKED", ips: [] });
+          const arr = Array.from(ips);
+          const leaked = arr.some(ip => ip !== publicIP);
+          done({ status: leaked ? "LEAK" : "SECURE", ips: arr });
+          return;
+        }
+        const cand = e.candidate.candidate;
+        const match = cand.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+        if (match) {
+          const ip = match[1];
+          if (ip !== "0.0.0.0" && !ip.startsWith("127.")) {
+            ips.add(ip);
+          }
+        }
+      };
+      pc.createOffer()
+        .then(offer => pc.setLocalDescription(offer))
+        .catch(() => done({ status: "ERROR", ips: [] }));
+    } catch (e) {
+      done({ status: "ERROR", ips: [] });
+    }
+  });
+}
+
+async function dnsTest() {
+  const tests = [
+    { name: "Cloudflare", url: "https://1.1.1.1/dns-query?name=example.com&type=A",
+      headers: { "accept": "application/dns-json" } },
+    { name: "Google", url: "https://dns.google/resolve?name=example.com&type=A",
+      headers: { "accept": "application/dns-json" } }
+  ];
+  const results = await Promise.all(tests.map(async t => {
+    const t0 = performance.now();
+    try {
+      await fetch(t.url, { headers: t.headers, cache: "no-store" });
+      return { name: t.name, time: performance.now() - t0, ok: true };
+    } catch (e) {
+      return { name: t.name, time: Infinity, ok: false };
+    }
+  }));
+  const best = results.filter(r => r.ok).sort((a, b) => a.time - b.time)[0];
+  if (!best) return { name: "Unknown", time: 0 };
+  return best;
+}
+
+function getConnectionType() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!conn) return "UNKNOWN";
+  const type = conn.type || conn.effectiveType || "";
+  if (type === "wifi") return "WI-FI";
+  if (type === "ethernet") return "ETHERNET";
+  if (type === "cellular") return "CELLULAR";
+  if (type === "4g") return "4G";
+  if (type === "3g") return "3G";
+  if (type === "2g") return "2G";
+  if (type === "slow-2g") return "SLOW 2G";
+  if (type === "bluetooth") return "BLUETOOTH";
+  if (type === "wimax") return "WIMAX";
+  if (type === "none") return "OFFLINE";
+  if (type === "unknown") return "UNKNOWN";
+  return type ? type.toUpperCase() : "UNKNOWN";
+}
+
+async function packetLossTest(count = 20) {
+  let lost = 0;
+  const promises = [];
+  for (let i = 0; i < count; i++) {
+    promises.push(
+      fetchWithTimeout(
+        "https://speed.cloudflare.com/__down?bytes=1&_=" + Date.now() + "_" + i,
+        { cache: "no-store" }, 3000
+      ).then(r => r.ok ? 0 : 1).catch(() => 1)
+    );
+  }
+  const results = await Promise.all(promises);
+  lost = results.reduce((a, b) => a + b, 0);
+  const percent = (lost / count) * 100;
+  return { lost, total: count, percent };
 }
 
 async function runCheck() {
@@ -448,16 +750,21 @@ async function runCheck() {
   const box = document.getElementById("ipBox");
   const ipValue = document.getElementById("ipValue");
   const geoLine = document.getElementById("geoLine");
-
+  const vpnBadge = document.getElementById("vpnBadge");
+  const extraInfo = document.getElementById("extraInfo");
   box.classList.remove("show");
   geoLine.classList.remove("show");
+  vpnBadge.classList.remove("show", "yes", "no");
+  extraInfo.classList.remove("show");
   void box.offsetWidth;
-
+  document.getElementById("valLeak").textContent = "scanning...";
+  document.getElementById("valLeak").className = "val";
+  document.getElementById("valDNS").textContent = "scanning...";
+  document.getElementById("valConn").textContent = "scanning...";
+  document.getElementById("valLoss").textContent = "scanning...";
   ipValue.textContent = "Scanning...";
   box.classList.add("show");
-
   const info = await fetchIPInfo();
-
   if (!info) {
     ipValue.textContent = "no connection";
     box.classList.remove("show");
@@ -465,22 +772,72 @@ async function runCheck() {
     box.classList.add("show");
     return;
   }
-
   ipValue.textContent = info.ip;
-
   if (info.country) {
     document.getElementById("flag").textContent = ccToFlag(info.cc);
     document.getElementById("countryText").textContent = info.country;
     document.getElementById("cityText").textContent = info.city || "—";
     geoLine.classList.add("show");
   }
-
+  if (info.vpn !== undefined && info.vpn !== null) {
+    vpnBadge.textContent = info.vpn ? "VPN: YES" : "VPN: NO";
+    vpnBadge.classList.add(info.vpn ? "yes" : "no");
+    vpnBadge.classList.add("show");
+  }
   box.classList.remove("show");
   void box.offsetWidth;
   box.classList.add("show");
+  extraInfo.classList.add("show");
+
+  webrtcLeakTest(info.ip).then(res => {
+    const el = document.getElementById("valLeak");
+    if (res.status === "SECURE") {
+      el.textContent = "SECURE";
+      el.className = "val good";
+    } else if (res.status === "LEAK") {
+      el.textContent = "⚠ LEAK (" + res.ips[0] + ")";
+      el.className = "val bad";
+    } else if (res.status === "BLOCKED") {
+      el.textContent = "BLOCKED";
+      el.className = "val good";
+    } else {
+      el.textContent = "ERROR";
+      el.className = "val warn";
+    }
+  });
+
+  dnsTest().then(res => {
+    const el = document.getElementById("valDNS");
+    el.textContent = res.name + " (" + Math.round(res.time) + "ms)";
+    el.className = "val";
+  });
+
+  const connType = getConnectionType();
+  document.getElementById("valConn").textContent = connType;
+  const connEl = document.getElementById("valConn");
+  if (connType.includes("WI-FI") || connType.includes("ETHERNET")) connEl.className = "val good";
+  else if (connType.includes("4G") || connType.includes("5G")) connEl.className = "val";
+  else if (connType.includes("3G") || connType.includes("2G")) connEl.className = "val warn";
+  else connEl.className = "val";
+
+  packetLossTest().then(res => {
+    const el = document.getElementById("valLoss");
+    if (res.percent === 0) {
+      el.textContent = "0% (" + res.total + "/" + res.total + ")";
+      el.className = "val good";
+    } else if (res.percent < 5) {
+      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
+      el.className = "val";
+    } else if (res.percent < 20) {
+      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
+      el.className = "val warn";
+    } else {
+      el.textContent = res.percent.toFixed(1) + "% (" + (res.total - res.lost) + "/" + res.total + ")";
+      el.className = "val bad";
+    }
+  });
 }
 
-// === УТИЛИТА: fetch с таймаутом ===
 function fetchWithTimeout(url, options = {}, ms = 8000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -488,7 +845,6 @@ function fetchWithTimeout(url, options = {}, ms = 8000) {
     .finally(() => clearTimeout(timer));
 }
 
-// === DOWNLOAD ===
 let downRunning = true;
 const downServers = [
   (t) => `https://speed.cloudflare.com/__down?bytes=200000000&_=${t}`,
@@ -498,7 +854,6 @@ const downServers = [
 ];
 let downServerIdx = 0;
 function setDownStatus(text) { document.getElementById("valDown").textContent = text; }
-
 async function downloadOnce() {
   const url = downServers[downServerIdx % downServers.length](Date.now());
   downServerIdx++;
@@ -526,13 +881,13 @@ async function downloadOnce() {
       setDownStatus(mbps.toFixed(2) + " Mbps");
       document.getElementById("barDown").style.width =
         Math.min(100, (mbps / 200) * 100) + "%";
+      pushGraphData(graphDataDown, mbps);
       windowBytes = 0;
       windowStart = now;
     }
   }
   if (!gotAnyData) throw new Error("no data");
 }
-
 async function downloadLoop() {
   let failures = 0;
   while (downRunning) {
@@ -549,10 +904,8 @@ async function downloadLoop() {
   }
 }
 
-// === UPLOAD ===
 let upRunning = true;
 function setUpStatus(text) { document.getElementById("valUp").textContent = text; }
-
 async function uploadLoop() {
   const chunkSize = 512 * 1024;
   const chunk = new Blob([new Uint8Array(chunkSize)], { type: "application/octet-stream" });
@@ -560,7 +913,6 @@ async function uploadLoop() {
   let windowStart = performance.now();
   let failures = 0;
   let lastProgress = performance.now();
-
   while (upRunning) {
     let ok = false;
     try {
@@ -569,7 +921,6 @@ async function uploadLoop() {
         { method: "POST", body: chunk, cache: "no-store" }, 10000);
       ok = res.ok;
     } catch (e) { ok = false; }
-
     if (ok) {
       failures = 0;
       windowBytes += chunkSize;
@@ -582,28 +933,53 @@ async function uploadLoop() {
         continue;
       }
     }
-
     const now = performance.now();
     const dt = now - windowStart;
     if (now - lastProgress > 3000 && failures > 0) setUpStatus("connecting...");
-
     if (dt >= 500 && windowBytes > 0) {
       const bps = windowBytes / (dt / 1000);
       const mbps = (bps * 8) / 1e6;
       setUpStatus(mbps.toFixed(2) + " Mbps");
       document.getElementById("barUp").style.width =
         Math.min(100, (mbps / 100) * 100) + "%";
+      pushGraphData(graphDataUp, mbps);
       windowBytes = 0;
       windowStart = performance.now();
     }
   }
 }
 
-// === АВТОСТАРТ: IP + ГЕО при загрузке ===
+let pingRunning = true;
+function setPingStatus(text) { document.getElementById("valPing").textContent = text; }
+async function pingLoop() {
+  while (pingRunning) {
+    const t0 = performance.now();
+    let ok = false;
+    try {
+      const res = await fetchWithTimeout(
+        "https://speed.cloudflare.com/__down?bytes=1&_=" + Date.now(),
+        { cache: "no-store" }, 5000);
+      ok = res.ok;
+    } catch (e) { ok = false; }
+    if (ok) {
+      const ping = performance.now() - t0;
+      setPingStatus(Math.round(ping) + " ms");
+      document.getElementById("barPing").style.width =
+        Math.min(100, (ping / 500) * 100) + "%";
+      pushGraphData(graphDataPing, ping);
+    } else {
+      setPingStatus("—");
+    }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+}
+
 window.addEventListener("load", () => {
-  runCheck();      // IP + страна + город автоматически
+  runCheck();
   downloadLoop();
   uploadLoop();
+  pingLoop();
+  showRandomQuote();
 });
 </script>
 </body>
